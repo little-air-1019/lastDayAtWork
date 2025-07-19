@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我不做了小卡</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh-tw.js"></script>
+    <style>
+        body {
+            background-color: #f8f1e9;
+            font-family: 'Noto Sans TC', sans-serif;
+            transition: all 0.3s ease;
+        }
+        .punch-card {
+            background-color: #ffffff;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        .punch-box {
+            transition: all 0.3s ease;
+        }
+        .punch-box:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        .punch-box.has-date {
+            background-color: #ffefd5;
+            color: #8b4513;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .header-decoration {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+            transition: all 0.3s ease;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+        }
+        .theme-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+        
+        /* Grayscale Theme */
+        body.grayscale {
+            background-color: #f0f0f0;
+            filter: grayscale(100%);
+        }
+        .grayscale .header-decoration {
+            background: linear-gradient(135deg, #aaaaaa 0%, #dddddd 100%);
+        }
+        .grayscale .punch-box.has-date {
+            background-color: #dddddd;
+            color: #333333;
+        }
+        
+        /* Print Styles */
+        @media print {
+            .no-print {
+                display: none;
+            }
+            body {
+                background-color: white;
+                filter: none !important;
+            }
+            .punch-card {
+                box-shadow: none;
+                page-break-after: always;
+            }
+            .print-table-container {
+                display: block !important;
+            }
+            .print-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+            }
+            .print-table th, .print-table td {
+                border: 1px solid #ddd;
+                padding: 8px 12px;
+                text-align: left;
+            }
+            .print-table th {
+                background-color: #f2f2f2;
+                font-weight: bold;
+            }
+            .print-table tr:nth-child(even) {
+                background-color: #f9f9f9;
+            }
+        }
+        
+        .print-table-container {
+            display: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 flex flex-col items-center justify-center">
+    <div class="punch-card w-full max-w-4xl rounded-xl overflow-hidden">
+        <div class="header-decoration p-6 text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-white">我不做了小卡</h1>
+            <p class="text-white mt-2">點擊格子來選擇讓妳不開心的日期</p>
+        </div>
+        
+        <div class="p-6">
+            <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 md:gap-4">
+                <!-- 48個集點格子 -->
+            </div>
+        </div>
+        
+        <div class="bg-gray-100 p-4 flex justify-between items-center no-print">
+            <button id="clearAllBtn" class="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded transition">
+                清除所有日期
+            </button>
+            <button id="printBtn" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded transition">
+                列印集點卡
+            </button>
+        </div>
+    </div>
+
+    <!-- 列印時顯示的表格 -->
+    <div class="print-table-container w-full max-w-4xl">
+        <h2 class="text-2xl font-bold mb-4 mt-8">不開心事件記錄</h2>
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th>日期</th>
+                    <th>事由</th>
+                </tr>
+            </thead>
+            <tbody id="detailsTableBody">
+                <!-- 表格內容將由JavaScript動態生成 -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 主題切換按鈕 -->
+    <button id="themeToggleBtn" class="theme-toggle no-print bg-gray-800 hover:bg-black text-white rounded-full p-3 shadow-lg">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        </svg>
+    </button>
+
+    <!-- 日期和事由輸入的彈出視窗 -->
+    <div id="dateReasonModal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-xl font-bold mb-4">記錄不開心的日期和事由</h2>
+            
+            <div class="mb-4">
+                <label class="block text-gray-700 mb-2">日期:</label>
+                <input type="text" id="dateInput" class="w-full p-2 border rounded">
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-gray-700 mb-2">事由:</label>
+                <textarea id="reasonInput" class="w-full p-2 border rounded" rows="3" placeholder="記錄讓你不開心的事情..."></textarea>
+            </div>
+            
+            <div class="flex justify-end gap-2">
+                <button id="cancelBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 px-4 rounded">取消</button>
+                <button id="saveBtn" class="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded">儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const gridContainer = document.querySelector('.grid');
+            const modal = document.getElementById('dateReasonModal');
+            const dateInput = document.getElementById('dateInput');
+            const reasonInput = document.getElementById('reasonInput');
+            const saveBtn = document.getElementById('saveBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+            const themeToggleBtn = document.getElementById('themeToggleBtn');
+            const detailsTableBody = document.getElementById('detailsTableBody');
+            let currentBox = null;
+            
+            // 檢查並應用已保存的主題
+            if (localStorage.getItem('grayscaleTheme') === 'true') {
+                document.body.classList.add('grayscale');
+                updateThemeIcon(true);
+            }
+            
+            // 創建48個集點格子
+            for (let i = 1; i <= 48; i++) {
+                const box = document.createElement('div');
+                box.className = 'punch-box bg-white border-2 border-amber-200 rounded-lg h-20 flex items-center justify-center cursor-pointer shadow-sm';
+                box.dataset.index = i;
+                box.innerHTML = `<span class="date-display text-center"></span>`;
+                
+                // 從localStorage讀取已保存的日期和事由
+                const savedDate = localStorage.getItem(`punch-date-${i}`);
+                const savedReason = localStorage.getItem(`punch-reason-${i}`);
+                
+                if (savedDate) {
+                    box.querySelector('.date-display').textContent = savedDate;
+                    box.classList.add('has-date');
+                    box.dataset.reason = savedReason || '';
+                }
+                
+                gridContainer.appendChild(box);
+            }
+            
+            // 初始化flatpickr
+            const fp = flatpickr(dateInput, {
+                locale: 'zh_tw',
+                dateFormat: 'Y/m/d',
+                disableMobile: true
+            });
+            
+            // 點擊格子時顯示彈出視窗
+            document.querySelectorAll('.punch-box').forEach(box => {
+                box.addEventListener('click', function() {
+                    currentBox = this;
+                    const index = this.dataset.index;
+                    
+                    // 設置當前日期和事由
+                    const currentDate = localStorage.getItem(`punch-date-${index}`) || '';
+                    const currentReason = localStorage.getItem(`punch-reason-${index}`) || '';
+                    
+                    dateInput.value = currentDate;
+                    reasonInput.value = currentReason;
+                    
+                    // 顯示彈出視窗
+                    modal.style.display = 'flex';
+                    
+                    // 如果有日期，打開日期選擇器
+                    if (!currentDate) {
+                        setTimeout(() => fp.open(), 100);
+                    }
+                });
+            });
+            
+            // 儲存按鈕
+            saveBtn.addEventListener('click', function() {
+                if (currentBox) {
+                    const index = currentBox.dataset.index;
+                    const dateValue = dateInput.value.trim();
+                    const reasonValue = reasonInput.value.trim();
+                    
+                    if (dateValue) {
+                        // 更新顯示
+                        currentBox.querySelector('.date-display').textContent = dateValue;
+                        currentBox.classList.add('has-date');
+                        currentBox.dataset.reason = reasonValue;
+                        
+                        // 儲存到localStorage
+                        localStorage.setItem(`punch-date-${index}`, dateValue);
+                        localStorage.setItem(`punch-reason-${index}`, reasonValue);
+                    } else {
+                        // 如果沒有日期，清除該格
+                        currentBox.querySelector('.date-display').textContent = '';
+                        currentBox.classList.remove('has-date');
+                        delete currentBox.dataset.reason;
+                        
+                        localStorage.removeItem(`punch-date-${index}`);
+                        localStorage.removeItem(`punch-reason-${index}`);
+                    }
+                }
+                
+                // 關閉彈出視窗
+                modal.style.display = 'none';
+            });
+            
+            // 取消按鈕
+            cancelBtn.addEventListener('click', function() {
+                modal.style.display = 'none';
+            });
+            
+            // 點擊彈出視窗外部關閉
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+            
+            // 清除所有日期
+            document.getElementById('clearAllBtn').addEventListener('click', function() {
+                if (confirm('確定要清除所有日期和事由嗎？')) {
+                    document.querySelectorAll('.punch-box').forEach(box => {
+                        const index = box.dataset.index;
+                        box.querySelector('.date-display').textContent = '';
+                        box.classList.remove('has-date');
+                        delete box.dataset.reason;
+                        localStorage.removeItem(`punch-date-${index}`);
+                        localStorage.removeItem(`punch-reason-${index}`);
+                    });
+                }
+            });
+            
+            // 列印功能
+            document.getElementById('printBtn').addEventListener('click', function() {
+                // 生成詳細表格
+                generateDetailsTable();
+                window.print();
+            });
+            
+            // 生成詳細表格
+            function generateDetailsTable() {
+                // 清空表格
+                detailsTableBody.innerHTML = '';
+                
+                // 收集所有有日期和事由的格子
+                const entries = [];
+                for (let i = 1; i <= 48; i++) {
+                    const date = localStorage.getItem(`punch-date-${i}`);
+                    const reason = localStorage.getItem(`punch-reason-${i}`);
+                    
+                    if (date) {
+                        entries.push({
+                            date: date,
+                            reason: reason || '(無事由)'
+                        });
+                    }
+                }
+                
+                // 按日期排序
+                entries.sort((a, b) => {
+                    return new Date(a.date.replace(/\//g, '-')) - new Date(b.date.replace(/\//g, '-'));
+                });
+                
+                // 生成表格行
+                entries.forEach(entry => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${entry.date}</td>
+                        <td>${entry.reason}</td>
+                    `;
+                    detailsTableBody.appendChild(row);
+                });
+                
+                // 如果沒有記錄，顯示提示
+                if (entries.length === 0) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td colspan="2" class="text-center py-4">尚無記錄</td>
+                    `;
+                    detailsTableBody.appendChild(row);
+                }
+            }
+            
+            // 主題切換功能
+            themeToggleBtn.addEventListener('click', function() {
+                const isGrayscale = document.body.classList.toggle('grayscale');
+                localStorage.setItem('grayscaleTheme', isGrayscale);
+                updateThemeIcon(isGrayscale);
+            });
+            
+            // 更新主題圖標
+            function updateThemeIcon(isGrayscale) {
+                if (isGrayscale) {
+                    themeToggleBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                    `;
+                } else {
+                    themeToggleBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        </svg>
+                    `;
+                }
+            }
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9611ff15d6156a81',t:'MTc1Mjg0MTg5MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
